@@ -23,39 +23,47 @@ pipeline {
         
         stage('Debug Project Structure') {
             steps {
-                bat 'dir /s /b'
-                
-                bat '''
-                    echo "Current directory:"
-                    cd
-                    echo "Directory content:"
-                    dir
-                    echo "Backend directory content (if exists):"
-                    if exist backend (cd backend && dir) else (echo "Backend directory not found")
-                    echo "Looking for pom.xml:"
-                    if exist pom.xml (echo "pom.xml found in root") else (echo "pom.xml not found in root")
-                    if exist backend\\pom.xml (echo "pom.xml found in backend") else (echo "pom.xml not found in backend")
-                '''
+                script {
+                    try {
+                        bat 'where cmd' // Vérifier si cmd est accessible
+                        bat 'dir /s /b'
+                        bat '''
+                            echo "Current directory:"
+                            cd
+                            echo "Directory content:"
+                            dir
+                            echo "Backend directory content (if exists):"
+                            if exist backend (cd backend && dir) else (echo "Backend directory not found")
+                            echo "Looking for pom.xml:"
+                            if exist pom.xml (echo "pom.xml found in root") else (echo "pom.xml not found in root")
+                            if exist backend\\pom.xml (echo "pom.xml found in backend") else (echo "pom.xml not found in backend")
+                        '''
+                    } catch (Exception e) {
+                        echo "Debug stage error: ${e.getMessage()}"
+                        error "Failed in debug stage"
+                    }
+                }
             }
         }
         
-       stage('Generate Backend Docker Image') {
-    steps {
-        script {
-            if (fileExists('pom.xml')) {
-                bat 'mvn clean install'
-                bat 'mkdir docker-build-context'
-                bat 'copy target\\*.jar docker-build-context\\app.jar'
-                bat 'copy Dockerfile docker-build-context\\'
-                dir('docker-build-context') {
-                    bat '"C:\\Program Files\\Docker\\Docker\\Resources\\bin\\docker.exe" build -t backend .'
+        stage('Generate Backend Docker Image') {
+            steps {
+                script {
+                    if (fileExists('pom.xml')) {
+                        bat 'mvn clean install'
+                        bat 'mkdir docker-build-context'
+                        bat 'copy target\\*.jar docker-build-context\\app.jar'
+                        bat 'copy Dockerfile docker-build-context\\'
+                        dir('docker-build-context') {
+                            bat '"C:\\Program Files\\Docker\\Docker\\Resources\\bin\\docker.exe" build -t backend .'
+                        }
+                    } else {
+                        error 'No pom.xml found'
+                    }
                 }
-            } else {
-                error 'No pom.xml found'
             }
         }
-    }
-}
+        
         stage('Run Docker Compose') {
             steps {
                 script {
